@@ -1,4 +1,5 @@
-FROM nvidia/cuda:10.0-cudnn7-runtime-ubuntu18.04
+#FROM nvidia/cuda:10.0-cudnn7-runtime-ubuntu18.04
+FROM tensorflow/tensorflow:1.14.0-gpu-py3
 
 WORKDIR /home
 
@@ -19,3 +20,7 @@ RUN conda --version
 RUN git clone https://github.com/plazowicz/ConditionalStyleGAN.git && cd ConditionalStyleGAN && pip install -r requirements.txt
 
 COPY dataset /home/ConditionalStyleGAN/dataset
+
+COPY data /home/ConditionalStyleGAN/data
+
+COPY extract_labels.py /home/ConditionalStyleGAN/
