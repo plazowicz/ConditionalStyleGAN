@@ -22,5 +22,3 @@ RUN git clone https://github.com/plazowicz/ConditionalStyleGAN.git && cd Conditi
 COPY dataset /home/ConditionalStyleGAN/dataset
 
 COPY data /home/ConditionalStyleGAN/data
-
-COPY extract_labels.py /home/ConditionalStyleGAN/
