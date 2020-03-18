@@ -7,3 +7,5 @@ six==1.14.0
 opencv-python==4.2.0.32
 pandas==1.0.2
 jupyter==1.0.0
+scikit-learn==0.22.2
+horology==1.1.0

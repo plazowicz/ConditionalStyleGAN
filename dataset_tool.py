@@ -304,17 +304,18 @@ def unpickle(file):
     return dict
 
 
-def create_from_images(tfrecord_dir, image_dir, shuffle, add_condition):
-    print("ADD CONDITION ", add_condition)
+def create_from_images(tfrecord_dir, image_dir, labels_path):
     print('Loading images from "%s"' % image_dir)
 
-    all_data = {"Filenames": os.listdir(image_dir)}
+    with open(labels_path, 'rb') as f:
+        all_data = pickle.load(f)
 
     image_filenames_temp = all_data["Filenames"]
-    # conditions_all = all_data["Labels"]  # for others use Clusters
-    # assert len(conditions_all) == len(image_filenames_temp)
+    conditions_all = all_data["Labels"]  # for others use Clusters
+    assert len(conditions_all) == len(image_filenames_temp)
 
     import pandas as pd
+
     df = pd.DataFrame.from_dict(all_data)
     # image_filenames_temp = sorted(glob.glob(os.path.join(image_dir, '*.jpg')))
     print("NUMBER OF FILES: ", len(image_filenames_temp))
@@ -379,114 +380,26 @@ def create_from_images(tfrecord_dir, image_dir, shuffle, add_condition):
         print("############# DELETED FILENAMES ############")
         print(deleted)
         df = df.drop(drop)
-        if add_condition == 1:
-            print("Adding Labels")
-            conditions = np.asarray(df["Labels"])
-            # labels = np.random.randint(0,np.max(conditions),len(image_filenames))
-            onehot = np.zeros((conditions.size, np.max(conditions) + 1), dtype=np.float32)
-            onehot[np.arange(conditions.size), conditions] = 1.0
-            print(onehot)
-            tfr.add_labels(onehot)
+
+        print("Adding Labels")
+        conditions = np.asarray(df["Labels"])
+        # labels = np.random.randint(0,np.max(conditions),len(image_filenames))
+        onehot = np.zeros((conditions.size, np.max(conditions) + 1), dtype=np.float32)
+        onehot[np.arange(conditions.size), conditions] = 1.0
+        print(onehot)
+        tfr.add_labels(onehot)
 
 
 # ----------------------------------------------------------------------------
 
-def execute_cmdline(argv):
-    prog = argv[0]
-    parser = argparse.ArgumentParser(
-        prog=prog,
-        description='Tool for creating multi-resolution TFRecords datasets for StyleGAN and ProGAN.',
-        epilog='Type "%s <command> -h" for more information.' % prog)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tf-record-dir', required=True, type=str)
+    parser.add_argument('--images-dir', required=True, type=str)
+    parser.add_argument("--labels-path", required=True, type=str)
+    args = parser.parse_args()
 
-    subparsers = parser.add_subparsers(dest='command')
-    subparsers.required = True
-
-    def add_command(cmd, desc, example=None):
-        epilog = 'Example: %s %s' % (prog, example) if example is not None else None
-        return subparsers.add_parser(cmd, description=desc, help=desc, epilog=epilog)
-
-    p = add_command('display', 'Display images in dataset.',
-                    'display datasets/mnist')
-    p.add_argument('tfrecord_dir', help='Directory containing dataset')
-
-    p = add_command('extract', 'Extract images from dataset.',
-                    'extract datasets/mnist mnist-images')
-    p.add_argument('tfrecord_dir', help='Directory containing dataset')
-    p.add_argument('output_dir', help='Directory to extract the images into')
-
-    p = add_command('compare', 'Compare two datasets.',
-                    'compare datasets/mydataset datasets/mnist')
-    p.add_argument('tfrecord_dir_a', help='Directory containing first dataset')
-    p.add_argument('tfrecord_dir_b', help='Directory containing second dataset')
-    p.add_argument('--ignore_labels', help='Ignore labels (default: 0)', type=int, default=0)
-
-    p = add_command('create_mnist', 'Create dataset for MNIST.',
-                    'create_mnist datasets/mnist ~/downloads/mnist')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('mnist_dir', help='Directory containing MNIST')
-
-    p = add_command('create_mnistrgb', 'Create dataset for MNIST-RGB.',
-                    'create_mnistrgb datasets/mnistrgb ~/downloads/mnist')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('mnist_dir', help='Directory containing MNIST')
-    p.add_argument('--num_images', help='Number of composite images to create (default: 1000000)', type=int,
-                   default=1000000)
-    p.add_argument('--random_seed', help='Random seed (default: 123)', type=int, default=123)
-
-    p = add_command('create_cifar10', 'Create dataset for CIFAR-10.',
-                    'create_cifar10 datasets/cifar10 ~/downloads/cifar10')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('cifar10_dir', help='Directory containing CIFAR-10')
-
-    p = add_command('create_cifar100', 'Create dataset for CIFAR-100.',
-                    'create_cifar100 datasets/cifar100 ~/downloads/cifar100')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('cifar100_dir', help='Directory containing CIFAR-100')
-
-    p = add_command('create_svhn', 'Create dataset for SVHN.',
-                    'create_svhn datasets/svhn ~/downloads/svhn')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('svhn_dir', help='Directory containing SVHN')
-
-    p = add_command('create_lsun', 'Create dataset for single LSUN category.',
-                    'create_lsun datasets/lsun-car-100k ~/downloads/lsun/car_lmdb --resolution 256 --max_images 100000')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('lmdb_dir', help='Directory containing LMDB database')
-    p.add_argument('--resolution', help='Output resolution (default: 256)', type=int, default=256)
-    p.add_argument('--max_images', help='Maximum number of images (default: none)', type=int, default=None)
-
-    p = add_command('create_lsun_wide', 'Create LSUN dataset with non-square aspect ratio.',
-                    'create_lsun_wide datasets/lsun-car-512x384 ~/downloads/lsun/car_lmdb --width 512 --height 384')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('lmdb_dir', help='Directory containing LMDB database')
-    p.add_argument('--width', help='Output width (default: 512)', type=int, default=512)
-    p.add_argument('--height', help='Output height (default: 384)', type=int, default=384)
-    p.add_argument('--max_images', help='Maximum number of images (default: none)', type=int, default=None)
-
-    p = add_command('create_celeba', 'Create dataset for CelebA.',
-                    'create_celeba datasets/celeba ~/downloads/celeba')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('celeba_dir', help='Directory containing CelebA')
-    p.add_argument('--cx', help='Center X coordinate (default: 89)', type=int, default=89)
-    p.add_argument('--cy', help='Center Y coordinate (default: 121)', type=int, default=121)
-
-    p = add_command('create_from_images', 'Create dataset from a directory full of images.',
-                    'create_from_images datasets/mydataset myimagedir')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('image_dir', help='Directory containing the images')
-    p.add_argument('--shuffle', help='Randomize image order (default: 1)', type=int, default=1)
-    p.add_argument('add_condition', help='1 if include labels', type=int, default=0)
-
-    p = add_command('create_from_hdf5', 'Create dataset from legacy HDF5 archive.',
-                    'create_from_hdf5 datasets/celebahq ~/downloads/celeba-hq-1024x1024.h5')
-    p.add_argument('tfrecord_dir', help='New dataset directory to be created')
-    p.add_argument('hdf5_filename', help='HDF5 archive containing the images')
-    p.add_argument('--shuffle', help='Randomize image order (default: 1)', type=int, default=1)
-
-    args = parser.parse_args(argv[1:] if len(argv) > 1 else ['-h'])
-    func = globals()[args.command]
-    del args.command
-    func(**vars(args))
+    create_from_images(args.tf_record_dir, args.images_dir, args.labels_path)
 
 
 # python dataset_tools.py --create_from_images tfrecord_dir './dataset/' image_dir './Data/LLD-logo_files'
@@ -498,6 +411,5 @@ def execute_cmdline(argv):
 #    fgrep -v " PNG 128x128 128x128+0+0 8-bit sRGB"| cut -d '~' -f 1 | \
 #    xargs --max-procs=16 -n 10000 rm
 if __name__ == "__main__":
-    execute_cmdline(sys.argv)
-
+    main()
 # ----------------------------------------------------------------------------

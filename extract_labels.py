@@ -4,6 +4,9 @@ import os
 import pickle
 import argparse
 
+from sklearn.cluster import KMeans
+from horology import timed
+
 
 def mini_batches_generator(dir_path, batch_size=32):
     images_names = os.listdir(dir_path)
@@ -20,6 +23,7 @@ def mini_batches_generator(dir_path, batch_size=32):
         yield x, batch_names
 
 
+@timed
 def compute_embeddings(dir_path, embeddings_path):
     model = tf.keras.applications.vgg16.VGG16(weights='imagenet', include_top=False, pooling='avg')
 
@@ -35,14 +39,47 @@ def compute_embeddings(dir_path, embeddings_path):
     with open(embeddings_path, 'wb') as f:
         pickle.dump(image_embeddings_dict, f, pickle.HIGHEST_PROTOCOL)
 
+    return image_embeddings_dict
+
+
+@timed
+def cluster_embeddings(embeddings):
+    kmeans = KMeans(n_clusters=10, verbose=1, n_jobs=-1)
+    kmeans.fit(embeddings)
+    return kmeans
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dir-path', required=True, type=str)
     parser.add_argument('--embeddings-path', required=True, type=str)
+    parser.add_argument("--labels-path", required=True, type=str)
     args = parser.parse_args()
 
-    compute_embeddings(args.dir_path, args.embeddings_path)
+    if os.path.exists(args.embeddings_path):
+        with open(args.embeddings_path, 'rb') as f:
+            embeddings_dict = pickle.load(f)
+    else:
+        embeddings_dict = compute_embeddings(args.dir_path, args.embeddings_path)
+
+    file_names = sorted(embeddings_dict.keys())
+
+    embeddings = []
+
+    for fn in file_names:
+        embeddings.append(embeddings_dict[fn])
+
+    embeddings = np.array(embeddings)
+
+    kmeans = cluster_embeddings(embeddings)
+
+    labels_dict = {
+        "Filenames": file_names,
+        "Labels": kmeans.labels_
+    }
+
+    with open(args.labels_path, 'wb') as f:
+        pickle.dump(labels_dict, f, pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == '__main__':
