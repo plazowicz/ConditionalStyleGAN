@@ -19,6 +19,4 @@ RUN conda --version
 
 RUN git clone https://github.com/plazowicz/ConditionalStyleGAN.git && cd ConditionalStyleGAN && pip install -r requirements.txt
 
-COPY dataset /home/ConditionalStyleGAN/dataset
-
 COPY data /home/ConditionalStyleGAN/data
